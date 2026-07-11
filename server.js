@@ -19,7 +19,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const SOURCE_URL = 'https://webgia.com/gia-vang/pnj/';
+const FALLBACK_URL = 'https://giavang.org/';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes — be a polite scraper
+const REQUEST_HEADERS = {
+  // A normal browser UA is polite and avoids naive bot-blocking.
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
+};
 
 let cache = {
   data: null,
@@ -46,13 +52,9 @@ function parseUsdNumber(text) {
   return cleaned ? parseFloat(cleaned) : null;
 }
 
-async function scrapePrices() {
+async function scrapePrimary() {
   const res = await fetch(SOURCE_URL, {
-    headers: {
-      // A normal browser UA is polite and avoids naive bot-blocking.
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
-    },
+    headers: REQUEST_HEADERS,
     timeout: 15000
   });
 
@@ -111,7 +113,7 @@ async function scrapePrices() {
   });
 
   if (!pnjBuy || !pnjSell) {
-    throw new Error('Could not parse PNJ price from source page — markup may have changed.');
+    throw new Error('Could not parse PNJ price from source page — markup may have changed, or the source has no live data right now.');
   }
 
   return {
@@ -121,6 +123,67 @@ async function scrapePrices() {
     source: SOURCE_URL,
     fetchedAt: new Date().toISOString()
   };
+}
+
+// webgia.com occasionally has an empty gold-price feed (seen in testing —
+// their own site shows blank tables, not a scraping issue). giavang.org
+// carries the same PNJ price as a nationwide comparison table, so we fall
+// back to it for the PNJ price alone; it has no spot/forex tables of its own.
+async function scrapeFallback() {
+  const res = await fetch(FALLBACK_URL, {
+    headers: REQUEST_HEADERS,
+    timeout: 15000
+  });
+
+  if (!res.ok) {
+    throw new Error(`Fallback source responded with ${res.status}`);
+  }
+
+  const html = await res.text();
+  const $ = cheerio.load(html);
+
+  // "Bảng so sánh giá Vàng Nhẫn 1 Chỉ" (#gia_vang_nhan) lists prices in
+  // x1000đ/lượng even though it's a per-chỉ product; convert lượng -> chỉ (÷10).
+  let pnjBuy = null;
+  let pnjSell = null;
+
+  $('#gia_vang_nhan').closest('section').find('table tr').each((_, row) => {
+    if (pnjBuy) return;
+    const cells = $(row).find('td, th').map((__, td) => $(td).text().trim()).get();
+    if (/PNJ/i.test(cells.join(' | '))) {
+      const numeric = cells.filter((c) => /^\d[\d.]*$/.test(c));
+      if (numeric.length >= 2) {
+        pnjBuy = Math.round((parseVndNumber(numeric[0]) * 1000) / 10);
+        pnjSell = Math.round((parseVndNumber(numeric[1]) * 1000) / 10);
+      }
+    }
+  });
+
+  if (!pnjBuy || !pnjSell) {
+    throw new Error('Could not parse PNJ price from fallback source either.');
+  }
+
+  return {
+    pnj: { buy: pnjBuy, sell: pnjSell, unit: 'VND per chỉ' },
+    globalSpot: null,
+    usdVnd: null,
+    source: FALLBACK_URL,
+    fetchedAt: new Date().toISOString()
+  };
+}
+
+async function scrapePrices() {
+  try {
+    return await scrapePrimary();
+  } catch (primaryErr) {
+    try {
+      const fallback = await scrapeFallback();
+      console.warn(`Primary source failed (${primaryErr.message}); used fallback ${FALLBACK_URL}`);
+      return fallback;
+    } catch (fallbackErr) {
+      throw new Error(`Primary source failed: ${primaryErr.message} | Fallback also failed: ${fallbackErr.message}`);
+    }
+  }
 }
 
 app.use(cors());
