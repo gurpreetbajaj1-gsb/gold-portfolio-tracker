@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gold Portfolio Tracker</title>
+<style>
+  :root{
+    --gold:#b8860b; --gold-light:#f4e4bc; --ink:#2b2520; --muted:#7a7266;
+    --bg:#fdfaf4; --card:#ffffff; --green:#1b7f4c; --red:#c0392b; --border:#eae3d3;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);padding:20px 14px 60px;}
+  .wrap{max-width:520px;margin:0 auto;}
+  h1{font-size:1.3rem;margin:0 0 4px;font-weight:700;letter-spacing:-0.01em;}
+  .sub{color:var(--muted);font-size:0.85rem;margin-bottom:20px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.03);}
+  .card h2{font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin:0 0 14px;display:flex;justify-content:space-between;align-items:center;}
+  .field{margin-bottom:12px;}
+  .field:last-child{margin-bottom:0;}
+  label{display:block;font-size:0.8rem;color:var(--muted);margin-bottom:5px;}
+  input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.95rem;background:#fffef9;color:var(--ink);}
+  input:focus{outline:2px solid var(--gold-light);border-color:var(--gold);}
+  .row{display:flex;gap:10px;}
+  .row .field{flex:1;}
+  .hero{background:linear-gradient(135deg,#1f1b16,#3a2f1f);color:#f4e4bc;border-radius:14px;padding:20px;margin-bottom:16px;}
+  .hero .label{font-size:0.75rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.05em;}
+  .hero .value{font-size:1.8rem;font-weight:700;margin:4px 0 2px;}
+  .pnl{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:0.85rem;font-weight:600;margin-top:8px;}
+  .pnl.pos{background:rgba(46,204,113,0.15);color:#7ee7ab;}
+  .pnl.neg{background:rgba(231,76,60,0.15);color:#ff9d90;}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;}
+  .stat .k{font-size:0.72rem;color:var(--muted);margin-bottom:3px;}
+  .stat .v{font-size:1rem;font-weight:600;}
+  .note{font-size:0.78rem;color:var(--muted);line-height:1.4;padding:12px 14px;background:#f7f2e6;border-radius:10px;border:1px solid var(--border);}
+  .status{font-size:0.75rem;margin-top:6px;}
+  .status.ok{color:var(--green);}
+  .status.warn{color:#a15c00;}
+  .status.err{color:var(--red);}
+  .btn{background:var(--gold);color:#fff;border:none;padding:10px 16px;border-radius:8px;font-size:0.88rem;font-weight:600;cursor:pointer;width:100%;margin-top:4px;}
+  .btn:active{opacity:0.85;}
+  .btn:disabled{opacity:0.5;cursor:default;}
+  .btn-ghost{background:none;border:1px solid var(--border);color:var(--ink);}
+  .btn-sm{background:none;border:none;color:var(--muted);font-size:0.75rem;cursor:pointer;padding:2px 6px;text-decoration:underline;}
+  .purchase-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:0.85rem;gap:8px;}
+  .purchase-row:last-child{border-bottom:none;}
+  .purchase-row .pinfo{flex:1;}
+  .purchase-row .pdate{color:var(--muted);font-size:0.72rem;}
+  .purchase-row .pqty{font-weight:600;}
+  .purchase-row .ppnl{text-align:right;font-weight:600;white-space:nowrap;}
+  .empty{color:var(--muted);font-size:0.85rem;text-align:center;padding:12px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🥇 Gold Portfolio Tracker</h1>
+  <div class="sub">Vietnam PNJ gold (per chỉ) &middot; VND</div>
+
+  <div class="card">
+    <h2>Add a Purchase</h2>
+    <div class="row">
+      <div class="field"><label>Quantity (chỉ)</label><input type="number" id="newQty" step="0.1" placeholder="e.g. 5"></div>
+      <div class="field"><label>Date</label><input type="date" id="newDate"></div>
+    </div>
+    <div class="field"><label>Total paid (VND)</label><input type="number" id="newPaid" step="100000" placeholder="e.g. 74400000"></div>
+    <button class="btn" onclick="addPurchase()">+ Add Purchase</button>
+  </div>
+
+  <div class="card">
+    <h2>
+      Current Market Price (PNJ, per chỉ)
+      <button class="btn-sm" onclick="refreshPrices(true)" style="text-decoration:none;">↻ refresh</button>
+    </h2>
+    <div class="row">
+      <div class="field"><label>PNJ buys back at</label><input type="number" id="buyback" step="10000"></div>
+      <div class="field"><label>PNJ sells at</label><input type="number" id="sellprice" step="10000"></div>
+    </div>
+    <div id="priceStatus" class="status">Loading live price…</div>
+  </div>
+
+  <div class="card">
+    <h2>VN Premium vs. Global Spot</h2>
+    <div class="row">
+      <div class="field"><label>Global spot (USD/oz)</label><input type="number" id="spotUsd" step="1"></div>
+      <div class="field"><label>USD/VND rate</label><input type="number" id="usdVnd" step="1"></div>
+    </div>
+    <div class="stats" style="margin-top:4px;">
+      <div class="stat"><div class="k">Global equiv. / chỉ</div><div class="v" id="globalPerChi">–</div></div>
+      <div class="stat"><div class="k">VN premium</div><div class="v" id="premiumPct">–</div></div>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="label">Total Portfolio Value (at PNJ buyback rate)</div>
+    <div class="value" id="curval">–</div>
+    <span class="pnl" id="pnlBadge">–</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">Total quantity</div><div class="v" id="totalQty">–</div></div>
+    <div class="stat"><div class="k">Avg. cost / chỉ</div><div class="v" id="avgcost">–</div></div>
+    <div class="stat"><div class="k">Total paid</div><div class="v" id="totalPaid">–</div></div>
+    <div class="stat"><div class="k">Gain / Loss</div><div class="v" id="pnlPct">–</div></div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <h2>Purchase History</h2>
+    <div id="purchaseList"><div class="empty">No purchases yet</div></div>
+  </div>
+
+  <div class="note">
+    <strong>Note:</strong> Prices auto-refresh from the server on page load (cached for 5 minutes to be polite to the source site). Hit "↻ refresh" to force a fresh pull. You can also edit any field manually. Purchases are saved in this browser's local storage.
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'gold-purchases';
+let purchases = [];
+
+function fmt(n){ return Math.round(n).toLocaleString('en-US') + ' ₫'; }
+function fmtChi(n){ return (Math.round(n*100)/100).toString() + ' chỉ'; }
+function genId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+function loadPurchases(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    purchases = raw ? JSON.parse(raw) : [];
+  }catch(e){
+    purchases = [];
+  }
+  if(purchases.length === 0){
+    // Seed with an example — edit/remove as needed.
+    purchases.push({id: genId(), date: '2026-07-08', qty: 5, paid: 74400000});
+    savePurchases();
+  }
+  renderList();
+  calc();
+}
+
+function savePurchases(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(purchases));
+}
+
+function addPurchase(){
+  const qty = parseFloat(document.getElementById('newQty').value);
+  const date = document.getElementById('newDate').value;
+  const paid = parseFloat(document.getElementById('newPaid').value);
+  if(!qty || qty <= 0 || !paid || paid <= 0 || !date){
+    alert('Please fill in quantity, date, and amount paid.');
+    return;
+  }
+  purchases.push({id: genId(), date, qty, paid});
+  purchases.sort((a,b) => a.date.localeCompare(b.date));
+  savePurchases();
+  document.getElementById('newQty').value = '';
+  document.getElementById('newDate').value = '';
+  document.getElementById('newPaid').value = '';
+  renderList();
+  calc();
+}
+
+function removePurchase(id){
+  purchases = purchases.filter(p => p.id !== id);
+  savePurchases();
+  renderList();
+  calc();
+}
+
+function renderList(){
+  const el = document.getElementById('purchaseList');
+  if(purchases.length === 0){
+    el.innerHTML = '<div class="empty">No purchases yet</div>';
+    return;
+  }
+  const buyback = parseFloat(document.getElementById('buyback').value) || 0;
+  el.innerHTML = purchases.map(p => {
+    const curVal = p.qty * buyback;
+    const pnl = curVal - p.paid;
+    const pnlPct = p.paid > 0 ? (pnl/p.paid)*100 : 0;
+    const color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    return `<div class="purchase-row">
+      <div class="pinfo">
+        <div class="pqty">${fmtChi(p.qty)}</div>
+        <div class="pdate">${p.date} &middot; paid ${fmt(p.paid)}</div>
+      </div>
+      <div class="ppnl" style="color:${color}">
+        ${pnl>=0?'+':''}${fmt(pnl)}<br>
+        <span style="font-weight:400;font-size:0.75rem;">${pnl>=0?'+':''}${pnlPct.toFixed(1)}%</span>
+      </div>
+      <button class="btn-sm" onclick="removePurchase('${p.id}')">remove</button>
+    </div>`;
+  }).join('');
+}
+
+function calcPremium(){
+  const spot = parseFloat(document.getElementById('spotUsd').value) || 0;
+  const rate = parseFloat(document.getElementById('usdVnd').value) || 0;
+  const sellprice = parseFloat(document.getElementById('sellprice').value) || 0;
+  const globalPerChiUsd = spot * (3.75 / 31.1034768);
+  const globalPerChiVnd = globalPerChiUsd * rate;
+  const premiumVnd = sellprice - globalPerChiVnd;
+  const premiumPct = globalPerChiVnd > 0 ? (premiumVnd / globalPerChiVnd) * 100 : 0;
+  document.getElementById('globalPerChi').textContent = globalPerChiVnd > 0 ? fmt(globalPerChiVnd) : '–';
+  const premEl = document.getElementById('premiumPct');
+  if(globalPerChiVnd > 0){
+    premEl.textContent = (premiumPct>=0?'+':'') + premiumPct.toFixed(1) + '%';
+    premEl.style.color = premiumPct >= 0 ? 'var(--red)' : 'var(--green)';
+  } else {
+    premEl.textContent = '–';
+  }
+}
+
+function calc(){
+  const buyback = parseFloat(document.getElementById('buyback').value) || 0;
+  const totalQty = purchases.reduce((s,p) => s + p.qty, 0);
+  const totalPaid = purchases.reduce((s,p) => s + p.paid, 0);
+  const avgCost = totalQty > 0 ? totalPaid / totalQty : 0;
+  const curVal = totalQty * buyback;
+  const pnlAmt = curVal - totalPaid;
+  const pnlPct = totalPaid > 0 ? (pnlAmt / totalPaid) * 100 : 0;
+
+  document.getElementById('curval').textContent = totalQty > 0 ? fmt(curVal) : '–';
+  document.getElementById('totalQty').textContent = totalQty > 0 ? fmtChi(totalQty) : '–';
+  document.getElementById('avgcost').textContent = totalQty > 0 ? fmt(avgCost) : '–';
+  document.getElementById('totalPaid').textContent = totalQty > 0 ? fmt(totalPaid) : '–';
+  document.getElementById('pnlPct').textContent = totalQty > 0 ? ((pnlPct>=0?'+':'') + pnlPct.toFixed(2) + '%') : '–';
+  document.getElementById('pnlPct').style.color = pnlAmt >= 0 ? 'var(--green)' : 'var(--red)';
+
+  const badge = document.getElementById('pnlBadge');
+  if(totalQty > 0){
+    badge.textContent = (pnlAmt >= 0 ? '▲ ' : '▼ ') + (pnlAmt >= 0 ? '+' : '') + fmt(pnlAmt) + ' (' + (pnlPct>=0?'+':'') + pnlPct.toFixed(2) + '%)';
+    badge.className = 'pnl ' + (pnlAmt >= 0 ? 'pos' : 'neg');
+  } else {
+    badge.textContent = 'Add a purchase to get started';
+    badge.className = 'pnl';
+  }
+  renderList();
+  calcPremium();
+}
+
+async function refreshPrices(force){
+  const statusEl = document.getElementById('priceStatus');
+  statusEl.textContent = 'Fetching live price…';
+  statusEl.className = 'status';
+  try{
+    const res = await fetch('/api/prices' + (force ? '?force=1' : ''));
+    const data = await res.json();
+    if(data.error && !data.pnj){
+      statusEl.textContent = '⚠ Could not fetch live price: ' + data.error + '. Enter manually below.';
+      statusEl.className = 'status err';
+      return;
+    }
+    document.getElementById('buyback').value = data.pnj.buy;
+    document.getElementById('sellprice').value = data.pnj.sell;
+    if(data.globalSpot) document.getElementById('spotUsd').value = data.globalSpot.usdPerOz;
+    if(data.usdVnd) document.getElementById('usdVnd').value = data.usdVnd.sell;
+
+    const time = new Date(data.fetchedAt).toLocaleString();
+    if(data.stale){
+      statusEl.textContent = `⚠ Using last known price from ${time} (live fetch failed: ${data.error})`;
+      statusEl.className = 'status warn';
+    } else {
+      statusEl.textContent = `✓ Live as of ${time}${data.cached ? ' (cached)' : ''}`;
+      statusEl.className = 'status ok';
+    }
+    calc();
+  }catch(e){
+    statusEl.textContent = '⚠ Could not reach server. Enter prices manually below.';
+    statusEl.className = 'status err';
+  }
+}
+
+document.getElementById('buyback').addEventListener('input', calc);
+document.getElementById('sellprice').addEventListener('input', calcPremium);
+document.getElementById('spotUsd').addEventListener('input', calcPremium);
+document.getElementById('usdVnd').addEventListener('input', calcPremium);
+
+loadPurchases();
+refreshPrices(false);
+</script>
+</body>
+</html>
