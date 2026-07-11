@@ -48,7 +48,6 @@
   .purchase-row .pinfo{flex:1;}
   .purchase-row .pdate{color:var(--muted);font-size:0.72rem;}
   .purchase-row .pqty{font-weight:600;}
-  .purchase-row .ppnl{text-align:right;font-weight:600;white-space:nowrap;}
   .empty{color:var(--muted);font-size:0.85rem;text-align:center;padding:12px 0;}
 </style>
 </head>
@@ -161,20 +160,11 @@ function renderList(){
     el.innerHTML = '<div class="empty">No purchases yet</div>';
     return;
   }
-  const buyback = parseFloat(document.getElementById('buyback').value) || 0;
   el.innerHTML = purchases.map(p => {
-    const curVal = p.qty * buyback;
-    const pnl = curVal - p.paid;
-    const pnlPct = p.paid > 0 ? (pnl/p.paid)*100 : 0;
-    const color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
     return `<div class="purchase-row">
       <div class="pinfo">
         <div class="pqty">${fmtChi(p.qty)}</div>
         <div class="pdate">${p.date} &middot; paid ${fmt(p.paid)}</div>
-      </div>
-      <div class="ppnl" style="color:${color}">
-        ${pnl>=0?'+':''}${fmt(pnl)}<br>
-        <span style="font-weight:400;font-size:0.75rem;">${pnl>=0?'+':''}${pnlPct.toFixed(1)}%</span>
       </div>
       <button class="btn-sm" onclick="removePurchase('${p.id}')">remove</button>
     </div>`;
