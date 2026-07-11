@@ -58,16 +58,6 @@
   <div class="sub">Vietnam PNJ gold (per chỉ) &middot; VND</div>
 
   <div class="card">
-    <h2>Add a Purchase</h2>
-    <div class="row">
-      <div class="field"><label>Quantity (chỉ)</label><input type="number" id="newQty" step="0.1" placeholder="e.g. 5"></div>
-      <div class="field"><label>Date</label><input type="date" id="newDate"></div>
-    </div>
-    <div class="field"><label>Total paid (VND)</label><input type="number" id="newPaid" step="100000" placeholder="e.g. 74400000"></div>
-    <button class="btn" onclick="addPurchase()">+ Add Purchase</button>
-  </div>
-
-  <div class="card">
     <h2>
       Current Market Price (PNJ, per chỉ)
       <button class="btn-sm" onclick="refreshPrices(true)" style="text-decoration:none;">↻ refresh</button>
@@ -77,18 +67,6 @@
       <div class="field"><label>PNJ sells at</label><input type="number" id="sellprice" step="10000"></div>
     </div>
     <div id="priceStatus" class="status">Loading live price…</div>
-  </div>
-
-  <div class="card">
-    <h2>VN Premium vs. Global Spot</h2>
-    <div class="row">
-      <div class="field"><label>Global spot (USD/oz)</label><input type="number" id="spotUsd" step="1"></div>
-      <div class="field"><label>USD/VND rate</label><input type="number" id="usdVnd" step="1"></div>
-    </div>
-    <div class="stats" style="margin-top:4px;">
-      <div class="stat"><div class="k">Global equiv. / chỉ</div><div class="v" id="globalPerChi">–</div></div>
-      <div class="stat"><div class="k">VN premium</div><div class="v" id="premiumPct">–</div></div>
-    </div>
   </div>
 
   <div class="hero">
@@ -107,6 +85,16 @@
   <div class="card" style="margin-top:16px;">
     <h2>Purchase History</h2>
     <div id="purchaseList"><div class="empty">No purchases yet</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Add a Purchase</h2>
+    <div class="row">
+      <div class="field"><label>Quantity (chỉ)</label><input type="number" id="newQty" step="0.1" placeholder="e.g. 5"></div>
+      <div class="field"><label>Date</label><input type="date" id="newDate"></div>
+    </div>
+    <div class="field"><label>Total paid (VND)</label><input type="number" id="newPaid" step="100000" placeholder="e.g. 74400000"></div>
+    <button class="btn" onclick="addPurchase()">+ Add Purchase</button>
   </div>
 
   <div class="note">
@@ -193,24 +181,6 @@ function renderList(){
   }).join('');
 }
 
-function calcPremium(){
-  const spot = parseFloat(document.getElementById('spotUsd').value) || 0;
-  const rate = parseFloat(document.getElementById('usdVnd').value) || 0;
-  const sellprice = parseFloat(document.getElementById('sellprice').value) || 0;
-  const globalPerChiUsd = spot * (3.75 / 31.1034768);
-  const globalPerChiVnd = globalPerChiUsd * rate;
-  const premiumVnd = sellprice - globalPerChiVnd;
-  const premiumPct = globalPerChiVnd > 0 ? (premiumVnd / globalPerChiVnd) * 100 : 0;
-  document.getElementById('globalPerChi').textContent = globalPerChiVnd > 0 ? fmt(globalPerChiVnd) : '–';
-  const premEl = document.getElementById('premiumPct');
-  if(globalPerChiVnd > 0){
-    premEl.textContent = (premiumPct>=0?'+':'') + premiumPct.toFixed(1) + '%';
-    premEl.style.color = premiumPct >= 0 ? 'var(--red)' : 'var(--green)';
-  } else {
-    premEl.textContent = '–';
-  }
-}
-
 function calc(){
   const buyback = parseFloat(document.getElementById('buyback').value) || 0;
   const totalQty = purchases.reduce((s,p) => s + p.qty, 0);
@@ -236,7 +206,6 @@ function calc(){
     badge.className = 'pnl';
   }
   renderList();
-  calcPremium();
 }
 
 async function refreshPrices(force){
@@ -253,8 +222,6 @@ async function refreshPrices(force){
     }
     document.getElementById('buyback').value = data.pnj.buy;
     document.getElementById('sellprice').value = data.pnj.sell;
-    if(data.globalSpot) document.getElementById('spotUsd').value = data.globalSpot.usdPerOz;
-    if(data.usdVnd) document.getElementById('usdVnd').value = data.usdVnd.sell;
 
     const time = new Date(data.fetchedAt).toLocaleString();
     if(data.stale){
@@ -272,9 +239,6 @@ async function refreshPrices(force){
 }
 
 document.getElementById('buyback').addEventListener('input', calc);
-document.getElementById('sellprice').addEventListener('input', calcPremium);
-document.getElementById('spotUsd').addEventListener('input', calcPremium);
-document.getElementById('usdVnd').addEventListener('input', calcPremium);
 
 loadPurchases();
 refreshPrices(false);
